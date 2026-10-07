@@ -1,16 +1,19 @@
 /**
  * Affonso Affiliate Proxy - Cloudflare Worker
  *
- * Snapshot of the live production Worker "aff" (aff.capgo.app).
+ * Proxies the Affonso pixel and APIs through your own domain (aff.capgo.app).
+ * The pixel is loaded from /r/pixel.js and posts clicks to /r/track, so that
+ * path must be proxied to the Affonso track API.
  */
 
-const directMap: Record<string, string> = {
+const ROUTES: Record<string, string> = {
   '/js/pixel.min.js': 'https://cdn.affonso.io/js/pixel.min.js',
   '/js/psl.min.js': 'https://cdn.affonso.io/js/psl.min.js',
   '/v1/track': 'https://api.affonso.io/v1/track',
   '/js/signups': 'https://api.affonso.io/v1/signups',
   '/r/pixel.js': 'https://cdn.affonso.io/js/pixel.min.js',
   '/r/psl.min.js': 'https://cdn.affonso.io/js/psl.min.js',
+  '/r/track': 'https://api.affonso.io/v1/track',
   '/r/v1/track': 'https://api.affonso.io/v1/track',
   '/r/signups': 'https://api.affonso.io/v1/signups',
 }
@@ -18,11 +21,31 @@ const directMap: Record<string, string> = {
 export default {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
+    const target = ROUTES[url.pathname]
 
-    if (directMap[url.pathname]) {
-      return fetch(new Request(directMap[url.pathname], request))
+    // Unknown paths used to fall through to fetch(request), which loops back
+    // to this zone and ends in a silent 522. Return a clear 404 instead.
+    if (!target) {
+      return new Response('Not Found', { status: 404 })
     }
 
-    return fetch(request)
+    const headers = new Headers(request.headers)
+    const ip = request.headers.get('cf-connecting-ip')
+    if (ip) {
+      // Forward the real visitor IP so Affonso fraud checks see it.
+      headers.set('X-Forwarded-For', ip)
+      headers.set('X-Real-IP', ip)
+    }
+    headers.delete('host')
+
+    const targetUrl = new URL(target)
+    targetUrl.search = url.search
+
+    return fetch(targetUrl.toString(), {
+      method: request.method,
+      headers,
+      body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
+      redirect: 'follow',
+    })
   },
 }

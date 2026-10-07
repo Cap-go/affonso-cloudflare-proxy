@@ -15,10 +15,13 @@ This is the Worker `aff` that serves `aff.capgo.app` in production.
 |---|---|
 | `yourdomain.com/r/pixel.js` | `cdn.affonso.io/js/pixel.min.js` |
 | `yourdomain.com/r/psl.min.js` | `cdn.affonso.io/js/psl.min.js` |
+| `yourdomain.com/r/track` | `api.affonso.io/v1/track` |
 | `yourdomain.com/r/v1/track` | `api.affonso.io/v1/track` |
 | `yourdomain.com/r/signups` | `api.affonso.io/v1/signups` |
 
-The `/js/pixel.min.js`, `/js/psl.min.js`, `/v1/track` and `/js/signups` aliases are also proxied.
+The `/js/pixel.min.js`, `/js/psl.min.js`, `/v1/track` and `/js/signups` aliases are also proxied. Any other path returns 404.
+
+The visitor's real IP (`cf-connecting-ip`) is forwarded as `X-Forwarded-For` and `X-Real-IP` so Affonso fraud checks see it.
 
 ## Manual Setup
 
